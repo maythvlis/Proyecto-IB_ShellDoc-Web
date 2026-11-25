@@ -43,16 +43,16 @@ def escapar_caracteres(texto):
 
 
 def leer_y_separar_sesion(ruta_sesion="session.txt"):
-    # se leen las líneas del archivo de sesión
-    archivo = open(ruta_sesion, "r", encoding="utf-8", errors="replace")
-    lineas = archivo.readlines()
-    archivo.close()
+    # se leen las líneas del archivo de sesión de forma segura con contexto
+    with open(ruta_sesion, "r", encoding="utf-8", errors="replace") as archivo:
+        lineas = archivo.readlines()
 
     comandos = []
     comando_actual = None
     numero_comando = 0
 
     for linea_original in lineas:
+        # se limpia cada línea antes de analizarla
         linea = limpiar_linea(linea_original)
 
         # se omiten las líneas automáticas de inicio y fin de script
@@ -105,28 +105,27 @@ def leer_y_separar_sesion(ruta_sesion="session.txt"):
 
 
 def crear_contenido_qmd(comandos, titulo="ShellDoc Web"):
-    contenido = []
-
     # se agrega la configuración inicial de quarto reveal.js
-    # se agrega la configuración inicial de quarto reveal.js
-    contenido.append("---")
-    contenido.append(f'title: "{titulo}"')
-    contenido.append("format:")
-    contenido.append("  revealjs:")
-    contenido.append("    theme: dark")
-    contenido.append("    slide-number: true")
-    contenido.append("    code-line-numbers: false")
-    contenido.append("    width: 1280")
-    contenido.append("    height: 720")
-    contenido.append("---")
-    contenido.append("")
+    contenido = [
+        "---",
+        f'title: "{titulo}"',
+        "format:",
+        "  revealjs:",
+        "    theme: dark",
+        "    slide-number: true",
+        "    code-line-numbers: false",
+        "    width: 1280",
+        "    height: 720",
+        "---",
+        "",
+    ]
 
     for item in comandos:
         numero = item["numero"]
         # se evitan triples comillas invertidas que cierren el bloque de código antes de tiempo
         comando_limpio = item["comando"].replace("```", "` ` `")
-        titulo_diapositiva = escapar_caracteres(
-            f"Comando {numero}: {comando_limpio}")
+        # se escapa el título de la diapositiva para evitar conflictos con markdown o quarto
+        titulo_diapositiva = escapar_caracteres(f"Comando {numero}: {comando_limpio}")
 
         contenido.append(f"## {titulo_diapositiva}")
         contenido.append("")
@@ -141,78 +140,73 @@ def crear_contenido_qmd(comandos, titulo="ShellDoc Web"):
         contenido.append("```")
         contenido.append("")
 
+    # se unen todas las líneas con salto de línea para formar el archivo qmd
     return "\n".join(contenido)
 
 
 def transformar_sesion_a_qmd(ruta_sesion="session.txt", ruta_salida="presentacion.qmd"):
+    # se obtienen los comandos y sus salidas desde el archivo de sesión
     comandos = leer_y_separar_sesion(ruta_sesion)
 
     # se lanza un error si no se detectan comandos en el archivo
     if len(comandos) == 0:
         raise ValueError("No se encontraron comandos en session.txt.")
 
+    # se construye el texto completo de la presentación en formato qmd
     texto_qmd = crear_contenido_qmd(comandos)
 
-    # se escribe el contenido final en presentacion.qmd
-    archivo_salida = open(ruta_salida, "w", encoding="utf-8")
-    archivo_salida.write(texto_qmd)
-    archivo_salida.close()
+    # se escribe el contenido final en el archivo de salida de forma segura
+    with open(ruta_salida, "w", encoding="utf-8") as archivo_salida:
+        archivo_salida.write(texto_qmd)
 
+    # se retorna la cantidad total de comandos transformados
     return len(comandos)
 
 
 def ejecutar_hilo_1(
     semaforo_qmd_listo=None,
     estado=None,
+    lock_estado=None,
     ruta_sesion="session.txt",
     ruta_salida="presentacion.qmd",
 ):
+    # se obtiene el nombre del hilo actual para mostrar logs claros
     nombre_hilo = threading.current_thread().name
-    print(
-        f"[{nombre_hilo}] Iniciando transformación de {ruta_sesion} a {ruta_salida}...")
+    print(f"[{nombre_hilo}] Iniciando transformación de {ruta_sesion} a {ruta_salida}...")
 
     try:
+        # se ejecuta la transformación completa de la sesión a qmd
         total_comandos = transformar_sesion_a_qmd(ruta_sesion, ruta_salida)
 
-        # se registra el éxito en el diccionario compartido si se recibe uno
+        # se registra el éxito en el diccionario compartido de forma segura
         if estado is not None:
-            estado["hilo_1_ok"] = True
-            estado["total_comandos"] = total_comandos
-            estado["error"] = None
+            if lock_estado:
+                with lock_estado:
+                    estado["hilo_1_ok"] = True
+                    estado["total_comandos"] = total_comandos
+                    estado["error"] = None
+            else:
+                estado["hilo_1_ok"] = True
+                estado["total_comandos"] = total_comandos
+                estado["error"] = None
 
-        print(
-            f"[{nombre_hilo}] Éxito: se generaron {total_comandos} diapositivas en {ruta_salida}."
-        )
-        print(f"[{nombre_hilo}] Liberando semáforo para el Hilo 2...")
-
-        # se libera el semáforo para habilitar al hilo 2
-        if semaforo_qmd_listo is not None:
-            semaforo_qmd_listo.release()
+        print(f"[{nombre_hilo}] Éxito: se generaron {total_comandos} diapositivas en {ruta_salida}.")
 
     except Exception as error:
         # se registra el fallo en el diccionario compartido si ocurre un error
         if estado is not None:
-            estado["hilo_1_ok"] = False
-            estado["error"] = str(error)
+            if lock_estado:
+                with lock_estado:
+                    estado["hilo_1_ok"] = False
+                    estado["error"] = str(error)
+            else:
+                estado["hilo_1_ok"] = False
+                estado["error"] = str(error)
 
         print(f"[{nombre_hilo}] Error durante la transformación: {error}")
 
-        # se libera el semáforo para evitar que el hilo 2 quede bloqueado
+    finally:
+        # se libera siempre el semáforo para no dejar bloqueado al siguiente hilo
         if semaforo_qmd_listo is not None:
+            print(f"[{nombre_hilo}] Liberando semáforo...")
             semaforo_qmd_listo.release()
-
-
-if __name__ == "__main__":
-    # se realiza una prueba local del hilo 1 con un semáforo inicializado en cero
-    semaforo_prueba = threading.Semaphore(0)
-    estado_prueba = {}
-
-    hilo_1 = threading.Thread(
-        target=ejecutar_hilo_1,
-        args=(semaforo_prueba, estado_prueba),
-        name="Hilo-1-Transformador",
-    )
-    hilo_1.start()
-    hilo_1.join()
-
-    print("Estado final:", estado_prueba)
