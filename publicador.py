@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 publicador.py - Hilo 4 (funcionalidad extra) de ShellDoc Web.
 
@@ -13,8 +12,6 @@ Configuracion (variables de entorno):
                      dentro de la carpeta del proyecto)
   GITHUB_TOKEN       Token personal (scope 'repo'). Opcional si ya hay SSH
                      o un credential helper configurado.
-
-Uso independiente (prueba):  python3 publicador.py
 """
 import os
 import re
@@ -40,7 +37,7 @@ def log(msg):
 
 
 def _git(args, cwd, env=None):
-    """Ejecuta git y devuelve stdout; lanza PublicacionError si falla."""
+    # Ejecuta git y devuelve stdout; lanza PublicacionError si falla.
     try:
         r = subprocess.run(["git", *args], cwd=cwd, env=env, text=True,
                            capture_output=True, timeout=TIMEOUT_GIT)
@@ -76,7 +73,7 @@ def _url_con_token(url):
 
 
 def _url_publica(url):
-    """Deduce https://USUARIO.github.io/REPO/ desde la URL del remoto."""
+    # Deduce https://USUARIO.github.io/REPO/ desde la URL del remoto."""
     m = re.search(r"github\.com[:/]([^/]+)/([^/]+?)(?:\.git)?/?$", url)
     if not m:
         return None
