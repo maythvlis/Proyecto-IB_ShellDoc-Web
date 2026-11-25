@@ -3,7 +3,7 @@ from coordinador import ejecutar_sistema
 
 
 def main():
-    exito = ejecutar_sistema()
+    exito = ejecutar_sistema(publicar="--publicar" in sys.argv)
 
     if exito:
         print("[MAIN] Proceso finalizado sin errores.")
