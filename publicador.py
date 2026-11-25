@@ -2,8 +2,9 @@
 publicador.py - Hilo 4 (funcionalidad extra) de ShellDoc Web.
 
 Publica presentacion.html en GitHub Pages (rama gh-pages) usando git.
-Este modulo NO crea semaforos: el coordinador le llama a publicar_sitio()
-despues de haber hecho acquire() sobre el semaforo correspondiente.
+Este modulo solo contiene la logica de publicacion (sin bloque main).
+main.py crea el Hilo 4 y llama a publicar_sitio() despues de haber hecho
+acquire() sobre semaforo_publicacion (definido en coordinador.py).
 
 Configuracion (variables de entorno):
   SHELLDOC_REPO_URL  URL del repositorio destino, p. ej.
@@ -37,7 +38,7 @@ def log(msg):
 
 
 def _git(args, cwd, env=None):
-    # Ejecuta git y devuelve stdout; lanza PublicacionError si falla.
+    """Ejecuta git y devuelve stdout; lanza PublicacionError si falla."""
     try:
         r = subprocess.run(["git", *args], cwd=cwd, env=env, text=True,
                            capture_output=True, timeout=TIMEOUT_GIT)
@@ -73,7 +74,7 @@ def _url_con_token(url):
 
 
 def _url_publica(url):
-    # Deduce https://USUARIO.github.io/REPO/ desde la URL del remoto."""
+    """Deduce https://USUARIO.github.io/REPO/ desde la URL del remoto."""
     m = re.search(r"github\.com[:/]([^/]+)/([^/]+?)(?:\.git)?/?$", url)
     if not m:
         return None
@@ -126,12 +127,3 @@ def publicar_sitio(base_dir=BASE_DIR):
     url_web = _url_publica(url_remoto)
     log(f"Publicacion completada. URL: {url_web or '(ver Settings > Pages)'}")
     return url_web
-
-
-if __name__ == "__main__":
-    threading.current_thread().name = "Hilo-4-Publicador"
-    try:
-        publicar_sitio()
-    except PublicacionError as e:
-        log(f"ERROR: {e}")
-        raise SystemExit(1)
