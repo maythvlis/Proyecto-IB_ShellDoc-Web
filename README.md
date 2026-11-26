@@ -21,7 +21,7 @@ Generación automatizada de presentaciones web a partir de sesiones de terminal 
 
 ---
 
-## Actividad 1 – Captura de la sesión Linux
+## Captura de la sesión Linux
 
 ### Descripción
 
