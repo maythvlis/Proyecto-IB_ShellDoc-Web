@@ -42,8 +42,8 @@ def hilo_transformador():
     nombre = "HILO 1 - TRANSFORMADOR"
     try:
         mostrar_estado(nombre, "Iniciando transformacion...")
-        from transformador import transformar_sesion
-        transformar_sesion()
+        from transformador import transformar_sesion_a_qmd
+        transformar_sesion_a_qmd()
 
         if evento_error.is_set():
             return
