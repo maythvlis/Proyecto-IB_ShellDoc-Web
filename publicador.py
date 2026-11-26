@@ -1,129 +1,77 @@
-"""
-publicador.py - Hilo 4 (funcionalidad extra) de ShellDoc Web.
-
-Publica presentacion.html en GitHub Pages (rama gh-pages) usando git.
-Este modulo solo contiene la logica de publicacion (sin bloque main).
-main.py crea el Hilo 4 y llama a publicar_sitio() despues de haber hecho
-acquire() sobre semaforo_publicacion (definido en coordinador.py).
-
-Configuracion (variables de entorno):
-  SHELLDOC_REPO_URL  URL del repositorio destino, p. ej.
-                     https://github.com/USUARIO/shelldoc-web.git
-                     (si no se define, se usa 'git remote get-url origin'
-                     dentro de la carpeta del proyecto)
-  GITHUB_TOKEN       Token personal (scope 'repo'). Opcional si ya hay SSH
-                     o un credential helper configurado.
-"""
 import os
-import re
 import shutil
 import subprocess
-import tempfile
-import threading
+from datetime import datetime
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent
-HTML = "presentacion.html"
-RECURSOS = ("presentacion_files", "site_libs")  # carpetas que deja renderizador.py
-RAMA = "gh-pages"
-TIMEOUT_GIT = 120
+
+def _ejecutar_git(args: list[str], cwd: Path) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        ["git", *args],
+        cwd=str(cwd),
+        text=True,
+        capture_output=True,
+        check=True,
+    )
 
 
-class PublicacionError(Exception):
-    """Error controlado durante la publicacion."""
-
-
-def log(msg):
-    print(f"[{threading.current_thread().name}] {msg}", flush=True)
-
-
-def _git(args, cwd, env=None):
-    """Ejecuta git y devuelve stdout; lanza PublicacionError si falla."""
-    try:
-        r = subprocess.run(["git", *args], cwd=cwd, env=env, text=True,
-                           capture_output=True, timeout=TIMEOUT_GIT)
-    except subprocess.TimeoutExpired:
-        raise PublicacionError(f"git {args[0]} excedio {TIMEOUT_GIT}s")
-    if r.returncode != 0:
-        # Nunca mostrar el token en los mensajes
-        err = (r.stderr or r.stdout).strip()
-        token = os.environ.get("GITHUB_TOKEN")
-        if token:
-            err = err.replace(token, "***")
-        raise PublicacionError(f"git {args[0]} fallo: {err}")
-    return r.stdout.strip()
-
-
-def _obtener_remoto(base):
-    url = os.environ.get("SHELLDOC_REPO_URL")
-    if not url:
-        try:
-            url = _git(["remote", "get-url", "origin"], cwd=base)
-        except PublicacionError:
-            raise PublicacionError(
-                "No hay repositorio destino: define SHELLDOC_REPO_URL "
-                "o configura 'git remote add origin ...'")
-    return url
-
-
-def _url_con_token(url):
-    token = os.environ.get("GITHUB_TOKEN")
-    if token and url.startswith("https://"):
-        return url.replace("https://", f"https://x-access-token:{token}@", 1)
-    return url
-
-
-def _url_publica(url):
-    """Deduce https://USUARIO.github.io/REPO/ desde la URL del remoto."""
-    m = re.search(r"github\.com[:/]([^/]+)/([^/]+?)(?:\.git)?/?$", url)
-    if not m:
-        return None
-    usuario, repo = m.groups()
-    return f"https://{usuario}.github.io/{repo}/"
-
-
-def verificar_prerequisitos(base):
-    if shutil.which("git") is None:
-        raise PublicacionError("git no esta instalado (sudo apt install git)")
-    html = base / HTML
-    if not html.is_file() or html.stat().st_size == 0:
-        raise PublicacionError(f"{HTML} no existe o esta vacio: no se publica")
-
-
-def publicar_sitio(base_dir=BASE_DIR):
+def publicar_presentacion(
+    archivo_html: str = "presentacion.html",
+    carpeta_docs: str = "docs",
+    rama: str = "main",
+    hacer_push: bool = True,
+) -> str:
     """
-    Publica presentacion.html en GitHub Pages.
-    Devuelve la URL publica (o None si no se pudo deducir).
-    Lanza PublicacionError ante cualquier fallo.
+    Hilo 4: Copia presentacion.html y recursos de Quarto (presentacion_files, site_libs)
+    hacia la carpeta de GitHub Pages (por defecto docs/) y publica mediante Git.
     """
-    base = Path(base_dir)
-    log("Verificando prerrequisitos de publicacion...")
-    verificar_prerequisitos(base)
+    proyecto = Path.cwd()
+    origen_html = proyecto / archivo_html
 
-    url_remoto = _obtener_remoto(base)
-    url_push = _url_con_token(url_remoto)
+    if not origen_html.is_file():
+        raise FileNotFoundError(f"No existe '{archivo_html}' para publicar.")
 
-    # Se arma el sitio en una carpeta temporal: nunca se toca el proyecto
-    with tempfile.TemporaryDirectory(prefix="shelldoc_pages_") as tmp:
-        sitio = Path(tmp)
-        log("Preparando archivos del sitio (index.html + recursos)...")
-        shutil.copy2(base / HTML, sitio / "index.html")
-        for carpeta in RECURSOS:
-            if (base / carpeta).is_dir():
-                shutil.copytree(base / carpeta, sitio / carpeta)
-        (sitio / ".nojekyll").touch()
+    if origen_html.stat().st_size == 0:
+        raise RuntimeError(f"El archivo '{archivo_html}' esta vacio.")
 
-        env = dict(os.environ, GIT_TERMINAL_PROMPT="0")  # nunca pedir clave
-        _git(["init", "-q"], sitio, env)
-        _git(["checkout", "-q", "-b", RAMA], sitio, env)
-        _git(["add", "-A"], sitio, env)
-        _git(["-c", "user.name=ShellDoc Bot",
-              "-c", "user.email=shelldoc@localhost",
-              "commit", "-q", "-m", "Publicacion automatica ShellDoc Web"],
-             sitio, env)
-        log(f"Enviando a la rama '{RAMA}' del repositorio...")
-        _git(["push", "-q", "--force", url_push, f"{RAMA}:{RAMA}"], sitio, env)
+    print("[PUBLICADOR] Preparando archivos para GitHub Pages...")
 
-    url_web = _url_publica(url_remoto)
-    log(f"Publicacion completada. URL: {url_web or '(ver Settings > Pages)'}")
-    return url_web
+    destino_docs = proyecto / carpeta_docs
+    destino_docs.mkdir(parents=True, exist_ok=True)
+
+    # En GitHub Pages con carpeta /docs, index.html es la entrada principal del sitio
+    destino_html = destino_docs / "index.html"
+    shutil.copy2(origen_html, destino_html)
+
+    # Copiar carpetas auxiliares generadas por Quarto/Reveal.js si existen
+    base_nombre = origen_html.stem
+    for carpeta_aux in (f"{base_nombre}_files", "site_libs"):
+        origen_aux = proyecto / carpeta_aux
+        if origen_aux.is_dir():
+            destino_aux = destino_docs / carpeta_aux
+            if destino_aux.exists():
+                shutil.rmtree(destino_aux)
+            shutil.copytree(origen_aux, destino_aux)
+
+    print(f"[PUBLICADOR] Archivos copiados a '{carpeta_docs}/index.html'.")
+
+    if not hacer_push:
+        print("[PUBLICADOR] hacer_push=False: publicacion local preparada sin 'git push'.")
+        return str(destino_html)
+
+    # Verificar que el directorio sea un repositorio Git válido
+    _ejecutar_git(["rev-parse", "--is-inside-work-tree"], cwd=proyecto)
+
+    _ejecutar_git(["add", carpeta_docs], cwd=proyecto)
+    estado_git = _ejecutar_git(["status", "--porcelain", carpeta_docs], cwd=proyecto).stdout.strip()
+
+    if not estado_git:
+        print(f"[PUBLICADOR] Sin cambios nuevos en '{carpeta_docs}/'. Nada que publicar.")
+        return str(destino_html)
+
+    mensaje_commit = f"Publicar presentacion ShellDoc Web ({datetime.now().strftime('%Y-%m-%d %H:%M:%S')})"
+    _ejecutar_git(["commit", "-m", mensaje_commit], cwd=proyecto)
+    _ejecutar_git(["push", "origin", rama], cwd=proyecto)
+
+    print(f"[PUBLICADOR] Publicacion completada en 'origin/{rama}' ({carpeta_docs}/).")
+    return str(destino_html)
