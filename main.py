@@ -1,8 +1,10 @@
 import sys
 from coordinador import ejecutar_sistema
 
+
 def main():
-    exito = ejecutar_sistema()
+    incluir_publicador = "--sin-publicador" not in sys.argv
+    exito = ejecutar_sistema(incluir_publicador=incluir_publicador)
 
     if exito:
         print("[MAIN] Proceso finalizado sin errores.")
@@ -10,6 +12,7 @@ def main():
     else:
         print("[MAIN] El proceso finalizo con errores.")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()
