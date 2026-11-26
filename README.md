@@ -49,5 +49,11 @@ Como resultado, se obtuvo el archivo `session.txt`, que constituye la entrada de
 
 Se obtuvo el archivo `session.txt`, que contiene el registro de la sesión Linux y permite continuar con la etapa de transformación del proyecto.
 
+## Presentación web – Funcionalidad extra (Hilo 4)
+
+La presentación generada por ShellDoc Web se encuentra disponible mediante GitHub Pages:
+https://maythvlis.github.io/Proyecto-IB_ShellDoc-Web/
+Esta funcionalidad permite publicar automáticamente la presentación HTML una vez finalizada correctamente la etapa de renderización.
+
 ---
 
