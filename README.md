@@ -52,7 +52,7 @@ Se obtuvo el archivo `session.txt`, que contiene el registro de la sesión Linux
 ## Presentación web – Funcionalidad extra (Hilo 4)
 
 La presentación generada por ShellDoc Web se encuentra disponible mediante GitHub Pages:
-https://maythvlis.github.io/Proyecto-IB_ShellDoc-Web/
+https://welltror.github.io/prueba_publicador/#/title-slide
 Esta funcionalidad permite publicar automáticamente la presentación HTML una vez finalizada correctamente la etapa de renderización.
 
 ---
