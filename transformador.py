@@ -106,6 +106,7 @@ def crear_contenido_qmd(comandos, titulo="ShellDoc Web"):
         "    theme: dark",
         "    highlight-style: monokai",
         "    slide-number: true",
+        "    embed-resources: true",
         "    scrollable: true",
         "    center: false",
         "    transition: slide",
