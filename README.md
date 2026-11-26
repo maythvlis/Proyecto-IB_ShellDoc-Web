@@ -12,8 +12,8 @@ Archivos generados
 session.txt: registro de la sesión Linux.
 
 Captura de la sesión Linux
-N.º	Comando	Descripción
-1	pwd	Muestra la ruta del directorio actual.
+Comandos y Descripción
+1	pwdM -> muestra la ruta del directorio actual.
 2	whoami	Identifica al usuario actual.
 3	date	Presenta la fecha y hora del sistema.
 4	hostname	Muestra el nombre del equipo.
