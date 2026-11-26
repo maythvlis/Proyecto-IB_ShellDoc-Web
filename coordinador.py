@@ -4,6 +4,7 @@ import os
 
 semaforo_transformacion = threading.Semaphore(0)
 semaforo_renderizacion = threading.Semaphore(0)
+semaforo_publicacion = threading.Semaphore(0)
 
 evento_error = threading.Event()
 evento_detener = threading.Event()
@@ -83,6 +84,7 @@ def hilo_renderizador():
         mostrar_estado(nombre, "Renderizacion completada correctamente.")
         mostrar_estado(nombre, "Liberando semaforo de renderizacion (signal).")
         semaforo_renderizacion.release()
+        semaforo_publicacion.release()
     except Exception as e:
         registrar_error(nombre, str(e))
 
@@ -103,6 +105,42 @@ def hilo_servidor():
         registrar_error(nombre, str(e))
 
 
+def hilo_publicador():
+    nombre = "HILO 4 - PUBLICADOR"
+
+    try:
+        mostrar_estado(nombre, "Esperando al HILO 2 (wait)...")
+
+        if not esperar_semaforo(
+            semaforo_publicacion, nombre, "HILO 2"
+        ):
+            return
+
+        mostrar_estado(nombre, "Iniciando publicacion local...")
+
+        if not os.path.isfile("presentacion.html"):
+            raise FileNotFoundError(
+                "No existe presentacion.html"
+            )
+
+        from publicador import publicar_presentacion
+
+        publicar_presentacion(hacer_push=False)
+
+        if not os.path.isfile("docs/index.html"):
+            raise FileNotFoundError(
+                "No se genero docs/index.html"
+            )
+
+        mostrar_estado(
+            nombre,
+            "Publicacion local preparada correctamente."
+        )
+
+    except Exception as e:
+        registrar_error(nombre, str(e))
+
+
 def ejecutar_sistema():
     print("=== SHELLDOC WEB ===")
 
@@ -115,7 +153,10 @@ def ejecutar_sistema():
     hilo1 = threading.Thread(target=hilo_transformador, name="HILO 1")
     hilo2 = threading.Thread(target=hilo_renderizador, name="HILO 2")
     hilo3 = threading.Thread(target=hilo_servidor, name="HILO 3")
-    hilos = [hilo1, hilo2, hilo3]
+    hilo4 = threading.Thread(
+        target=hilo_publicador, name="HILO 4"
+    )
+    hilos = [hilo1, hilo2, hilo3, hilo4]
 
     for hilo in hilos:
         hilo.start()
